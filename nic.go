@@ -21,14 +21,14 @@ import (
 
 // NIC represents an virtual Ethernet instance.
 type NIC struct {
-	// MAC address
-	MAC net.HardwareAddr
-
 	// Link is a gVisor channel endpoint
 	Link *channel.Endpoint
 
 	// Device is the physical interface associated to the virtual one.
 	Device *Net
+
+	// MAC address
+	mac net.HardwareAddr
 }
 
 type notification struct {
@@ -46,17 +46,11 @@ func (nic *NIC) Init() (err error) {
 		return errors.New("missing link endpoint")
 	}
 
-	if len(nic.MAC) != 6 {
-		return errors.New("invalid MAC address")
-	}
-
 	if nic.Device == nil {
 		return
 	}
 
-	nic.Device.MAC = nic.MAC
 	nic.Device.RxHandler = nic.Rx
-	nic.Device.Init()
 
 	nic.Link.AddNotify(&notification{
 		nic: nic,
@@ -100,7 +94,7 @@ func (nic *NIC) Tx() (buf []byte) {
 
 	// Ethernet frame header
 	buf = append(buf, pkt.EgressRoute.RemoteLinkAddress...)
-	buf = append(buf, nic.MAC...)
+	buf = append(buf, nic.mac...)
 	buf = append(buf, proto...)
 
 	for _, v := range pkt.AsSlices() {

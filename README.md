@@ -18,7 +18,7 @@ dev := &vnet.Net{
 	Base: microvm.VIRTIO_NET_BASE,
 }
 
-iface, _ := vnet.Init(dev, "10.0.0.1", "255.255.255.0", "1a:55:89:a2:69:41", "10.0.0.2")
+iface, _ := vnet.Init(dev, "10.0.0.1", "255.255.255.0", "10.0.0.2")
 
 net.SocketFunc = iface.Socket
 ```

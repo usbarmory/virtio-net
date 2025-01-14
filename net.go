@@ -6,7 +6,8 @@
 // Use of this source code is governed by the license
 // that can be found in the LICENSE file.
 
-// Package vnet implements TCP/IP connectivity through VirtIO networking.
+// Package vnet implements TCP/IP connectivity through a VirtIO (version 1.2)
+// network device.
 //
 // The TCP/IP stack is implemented using gVisor pure Go implementation.
 //
@@ -35,9 +36,6 @@ import (
 )
 
 var (
-	// MTU represents the Ethernet Maximum Transmission Unit.
-	MTU uint32 = 1500
-
 	// NICID represents the default gVisor NIC identifier
 	NICID = tcpip.NICID(1)
 
@@ -62,18 +60,18 @@ type Interface struct {
 	Link  *channel.Endpoint
 }
 
-func (iface *Interface) configure(mac string, ip tcpip.AddressWithPrefix, gw tcpip.Address) (err error) {
+func (iface *Interface) configure(mac net.HardwareAddr, ip tcpip.AddressWithPrefix, gw tcpip.Address, mtu uint32) (err error) {
 	if iface.Stack == nil {
 		iface.Stack = stack.New(DefaultStackOptions)
 	}
 
-	linkAddr, err := tcpip.ParseMACAddress(mac)
+	linkAddr, err := tcpip.ParseMACAddress(mac.String())
 
 	if err != nil {
 		return
 	}
 
-	iface.Link = channel.New(256, MTU, linkAddr)
+	iface.Link = channel.New(256, mtu, linkAddr)
 	iface.Link.LinkEPCapabilities |= stack.CapabilityResolutionRequired
 
 	linkEP := stack.LinkEndpoint(iface.Link)
@@ -225,12 +223,12 @@ func fullAddr(a string) (tcpip.FullAddress, error) {
 
 // Init initializes a VirtIO Network interface associating it to a gVisor link,
 // a default NICID and TCP/IP gVisor Stack are set if not previously assigned.
-func (iface *Interface) Init(nic *Net, ip string, netmask string, mac string, gateway string) (err error) {
-	address, err := net.ParseMAC(mac)
-
-	if err != nil {
+func (iface *Interface) Init(nic *Net, ip string, netmask string, gateway string) (err error) {
+	if err = nic.Init(); err != nil {
 		return
 	}
+
+	cfg := nic.Config()
 
 	if iface.NICID == 0 {
 		iface.NICID = NICID
@@ -243,15 +241,15 @@ func (iface *Interface) Init(nic *Net, ip string, netmask string, mac string, ga
 
 	gwAddr := tcpip.AddrFromSlice(net.ParseIP(gateway)).To4()
 
-	if err = iface.configure(mac, ipAddr, gwAddr); err != nil {
+	if err = iface.configure(cfg.MAC[:], ipAddr, gwAddr, uint32(cfg.MTU)); err != nil {
 		return
 	}
 
 	if iface.NIC == nil {
 		iface.NIC = &NIC{
-			MAC:    address,
 			Link:   iface.Link,
 			Device: nic,
+			mac:    cfg.MAC[:],
 		}
 
 		err = iface.NIC.Init()
