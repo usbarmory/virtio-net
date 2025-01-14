@@ -10,6 +10,7 @@ package vnet
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"runtime"
 	"sync"
@@ -80,6 +81,11 @@ type Net struct {
 
 	// VirtIO instance
 	io *virtio.VirtIO
+
+	// receive queue
+	rx *virtio.VirtualQueue
+	// transmit queue
+	tx *virtio.VirtualQueue
 }
 
 // Init initializes the VirtIO network device.
@@ -100,13 +106,21 @@ func (hw *Net) Init() (err error) {
 		return fmt.Errorf("incompatible device ID (%x)", id)
 	}
 
+	size := hw.io.MaxQueueSize()
+
+	if size == 0 || hw.io.QueueReady(0) || hw.io.QueueReady(1) {
+		return errors.New("queues unavailable")
+	}
+
 	// receiveq1
-	hw.io.SelectQueue(0)
-	hw.io.SetQueueSize(hw.io.MaxQueueSize())
+	hw.rx = &virtio.VirtualQueue{}
+	hw.rx.Init(size)
+	hw.io.SetQueueSize(0, size)
 
 	// transmitq1
-	hw.io.SelectQueue(1)
-	hw.io.SetQueueSize(hw.io.MaxQueueSize())
+	hw.tx = &virtio.VirtualQueue{}
+	hw.tx.Init(size)
+	hw.io.SetQueueSize(1, size)
 
 	return
 }
