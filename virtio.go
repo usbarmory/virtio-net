@@ -206,7 +206,6 @@ func (hw *Net) Start(rx bool) {
 	hw.io.SetQueue(txq, hw.tx)
 
 	hw.io.QueueNotify(rxq)
-	hw.io.QueueNotify(txq)
 
 	for {
 		runtime.Gosched()
@@ -232,11 +231,7 @@ func (hw *Net) Rx() []byte {
 // Tx transmits a single network frame, the checksum is appended automatically
 // and must not be included.
 func (hw *Net) Tx(buf []byte) {
-	hdr := &Header{
-		//Flags:      1 << NeedsChecksum,
-		//CSumOffset: uint16(len(buf)),
-	}
-
+	hdr := &Header{}
 	buf = append(hdr.Bytes(), buf...)
 
 	hw.tx.Push(buf)
