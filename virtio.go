@@ -198,7 +198,7 @@ func (hw *Net) Config() (config Config) {
 func (hw *Net) Start(rx bool) {
 	var buf []byte
 
-	if !rx || hw.RxHandler == nil || hw.rx == nil {
+	if hw.rx == nil || hw.tx == nil {
 		return
 	}
 
@@ -206,6 +206,10 @@ func (hw *Net) Start(rx bool) {
 	hw.io.SetQueue(txq, hw.tx)
 
 	hw.io.QueueNotify(rxq)
+
+	if !rx || hw.RxHandler == nil {
+		return
+	}
 
 	for {
 		runtime.Gosched()
