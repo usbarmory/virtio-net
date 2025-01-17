@@ -36,6 +36,9 @@ import (
 )
 
 var (
+	// MTU represents the Maximum Transmission Unit
+	MTU uint32 = 1518
+
 	// NICID represents the default gVisor NIC identifier
 	NICID = tcpip.NICID(1)
 
@@ -60,7 +63,7 @@ type Interface struct {
 	Link  *channel.Endpoint
 }
 
-func (iface *Interface) configure(mac net.HardwareAddr, ip tcpip.AddressWithPrefix, gw tcpip.Address, mtu uint32) (err error) {
+func (iface *Interface) configure(mac net.HardwareAddr, ip tcpip.AddressWithPrefix, gw tcpip.Address) (err error) {
 	if iface.Stack == nil {
 		iface.Stack = stack.New(DefaultStackOptions)
 	}
@@ -71,7 +74,7 @@ func (iface *Interface) configure(mac net.HardwareAddr, ip tcpip.AddressWithPref
 		return
 	}
 
-	iface.Link = channel.New(256, mtu, linkAddr)
+	iface.Link = channel.New(256, MTU, linkAddr)
 	iface.Link.LinkEPCapabilities |= stack.CapabilityResolutionRequired
 
 	linkEP := stack.LinkEndpoint(iface.Link)
@@ -241,7 +244,7 @@ func (iface *Interface) Init(nic *Net, ip string, netmask string, gateway string
 
 	gwAddr := tcpip.AddrFromSlice(net.ParseIP(gateway)).To4()
 
-	if err = iface.configure(cfg.MAC[:], ipAddr, gwAddr, uint32(cfg.MTU)); err != nil {
+	if err = iface.configure(cfg.MAC[:], ipAddr, gwAddr); err != nil {
 		return
 	}
 

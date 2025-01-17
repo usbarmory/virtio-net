@@ -138,8 +138,7 @@ type Net struct {
 }
 
 func (hw *Net) initQueue(index int, flags uint16) (queue *virtio.VirtualQueue) {
-	//size := hw.io.MaxQueueSize(index)
-	size := 8
+	size := hw.io.MaxQueueSize(index)
 	length := MTU + headerLength
 
 	queue = &virtio.VirtualQueue{}
