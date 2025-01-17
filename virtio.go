@@ -9,6 +9,7 @@
 package vnet
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -18,13 +19,13 @@ import (
 	"github.com/usbarmory/tamago/kvm/virtio"
 )
 
-// VirtIO configuration
+// Device parameters
 const (
 	DeviceID   = 0x01
 	ConfigSize = 24
 )
 
-// transmit/receive queue pairs
+// virtual queue pairs
 const (
 	// receiveq1
 	rxq = 0
@@ -32,7 +33,7 @@ const (
 	txq = 1
 )
 
-// Config constants
+// Configuration constants
 const (
 	STATUS_DOWN = 0
 	STATUS_UP   = 1
@@ -56,16 +57,22 @@ const (
 
 // Supported Features
 const (
-	VIRTIO_NET_F_CSUM         = (1 << 0)
-	VIRTIO_NET_F_MTU          = (1 << 3)
-	VIRTIO_NET_F_MAC          = (1 << 5)
-	VIRTIO_NET_F_STATUS       = (1 << 16)
-	VIRTIO_NET_F_SPEED_DUPLEX = (1 << 63)
+	FeatureChecksum    = (1 << 0)
+	FeatureMTU         = (1 << 3)
+	FeatureMAC         = (1 << 5)
+	FeatureStatus      = (1 << 16)
+	FeatureSpeedDuplex = (1 << 63)
 
-	DriverFeatures = VIRTIO_NET_F_CSUM | VIRTIO_NET_F_MTU | VIRTIO_NET_F_MAC | VIRTIO_NET_F_STATUS | VIRTIO_NET_F_SPEED_DUPLEX
+	DriverFeatures = FeatureChecksum | FeatureMTU | FeatureMAC | FeatureStatus | FeatureSpeedDuplex
 )
 
-type VirtIONetHeader struct {
+// Header flags
+const (
+	NeedsChecksum = 0
+)
+
+// Header represents a VirtIO network device header (virtio_net_hdr)
+type Header struct {
 	Flags      uint8
 	GSOType    uint8
 	HdrLen     uint16
@@ -76,6 +83,16 @@ type VirtIONetHeader struct {
 	// NumBuffers uint16
 }
 
+const headerLength = 10
+
+// Bytes converts the descriptor structure to byte array format.
+func (d *Header) Bytes() []byte {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, d)
+	return buf.Bytes()
+}
+
+// Config represents a VirtIO network device configuration
 type Config struct {
 	// MAC represents the interface physical address.
 	MAC [6]byte
@@ -108,6 +125,8 @@ type Net struct {
 
 	// Incoming packet handler
 	RxHandler func([]byte)
+	// Maximum Transmission Unit
+	MTU uint16
 
 	// VirtIO instance
 	io *virtio.VirtIO
@@ -121,7 +140,7 @@ type Net struct {
 func (hw *Net) initQueue(index int, flags uint16) (queue *virtio.VirtualQueue) {
 	//size := hw.io.MaxQueueSize(index)
 	size := 8
-	length := 1518 + 12 // MTU + virtio_net_hdr (FIXME)
+	length := MTU + headerLength
 
 	queue = &virtio.VirtualQueue{}
 	queue.Init(size, int(length), flags)
@@ -147,6 +166,10 @@ func (hw *Net) Init() (err error) {
 
 	if id := hw.io.DeviceID(); id != DeviceID {
 		return fmt.Errorf("incompatible device ID (%x != DeviceID)", id, DeviceID)
+	}
+
+	if mtu := hw.Config().MTU; hw.MTU > mtu {
+		return fmt.Errorf("incompatible MTU ID (%d > %d)", hw.MTU, mtu)
 	}
 
 	if hw.io.QueueReady(rxq) || hw.io.QueueReady(txq) {
@@ -189,8 +212,6 @@ func (hw *Net) Start(rx bool) {
 	for {
 		runtime.Gosched()
 
-		hw.rx.Debug()
-
 		if buf = hw.Rx(); buf != nil {
 			hw.RxHandler(buf)
 		}
@@ -199,12 +220,26 @@ func (hw *Net) Start(rx bool) {
 
 // Rx receives a single network frame, excluding the checksum, from the MAC
 // controller ring buffer.
-func (hw *Net) Rx() (buf []byte) {
-	return hw.rx.Pop()
+func (hw *Net) Rx() []byte {
+	buf := hw.rx.Pop()
+
+	if len(buf) < headerLength {
+		return nil
+	}
+
+	return buf[headerLength:]
 }
 
 // Tx transmits a single network frame, the checksum is appended automatically
 // and must not be included.
 func (hw *Net) Tx(buf []byte) {
-	hw.rx.Push(buf)
+	hdr := &Header{
+		//Flags:      1 << NeedsChecksum,
+		//CSumOffset: uint16(len(buf)),
+	}
+
+	buf = append(hdr.Bytes(), buf...)
+
+	hw.tx.Push(buf)
+	hw.io.QueueNotify(txq)
 }
