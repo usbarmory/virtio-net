@@ -227,6 +227,8 @@ func fullAddr(a string) (tcpip.FullAddress, error) {
 // Init initializes a VirtIO Network interface associating it to a gVisor link,
 // a default NICID and TCP/IP gVisor Stack are set if not previously assigned.
 func (iface *Interface) Init(nic *Net, ip string, netmask string, gateway string) (err error) {
+	nic.MTU = uint16(MTU)
+
 	if err = nic.Init(); err != nil {
 		return
 	}
