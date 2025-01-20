@@ -79,11 +79,13 @@ type Header struct {
 	GSOSize    uint16
 	CSumStart  uint16
 	CSumOffset uint16
-	// not used in legacy drivers (FIXME: detect?)
-	// NumBuffers uint16
+	NumBuffers uint16 // not used in legacy drivers
 }
 
-const headerLength = 10
+// HeaderLength defines the VirtIO network device header length, given that
+// certain legacy implementations (e.g. QEMU) omit certain fields, and that the
+// header is not used by the driver, its length is defined as a variable.
+var HeaderLength = 10
 
 // Bytes converts the descriptor structure to byte array format.
 func (d *Header) Bytes() []byte {
@@ -139,7 +141,7 @@ type Net struct {
 
 func (hw *Net) initQueue(index int, flags uint16) (queue *virtio.VirtualQueue) {
 	size := hw.io.MaxQueueSize(index)
-	length := hw.MTU + headerLength
+	length := hw.MTU + uint16(HeaderLength)
 
 	queue = &virtio.VirtualQueue{}
 	queue.Init(size, int(length), flags)
@@ -225,18 +227,18 @@ func (hw *Net) Start(rx bool) {
 func (hw *Net) Rx() []byte {
 	buf := hw.rx.Pop()
 
-	if len(buf) < headerLength {
+	if len(buf) < HeaderLength {
 		return nil
 	}
 
-	return buf[headerLength:]
+	return buf[HeaderLength:]
 }
 
 // Tx transmits a single network frame, the checksum is appended automatically
 // and must not be included.
 func (hw *Net) Tx(buf []byte) {
-	hdr := &Header{}
-	buf = append(hdr.Bytes(), buf...)
+	hdr := make([]byte, HeaderLength)
+	buf = append(hdr, buf...)
 
 	hw.tx.Push(buf)
 	hw.io.QueueNotify(txq)
