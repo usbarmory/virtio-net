@@ -1,7 +1,6 @@
 // VirtIO network driver
 //
 // Copyright (c) WithSecure Corporation
-// https://foundry.withsecure.com
 //
 // Use of this source code is governed by the license
 // that can be found in the LICENSE file.
@@ -124,6 +123,8 @@ type Net struct {
 	Index int
 	// Base register
 	Base uint32
+	// Interrupt ID
+	IRQ int
 
 	// Incoming packet handler
 	RxHandler func([]byte)
