@@ -82,10 +82,7 @@ type Header struct {
 	NumBuffers uint16 // not used in legacy drivers
 }
 
-// HeaderLength defines the VirtIO network device header length, given that
-// certain legacy implementations (e.g. QEMU) omit certain fields, and that the
-// header is not used by the driver, its length is defined as a variable.
-var HeaderLength = 10
+const headerLength = 12
 
 // Bytes converts the descriptor structure to byte array format.
 func (d *Header) Bytes() []byte {
@@ -129,6 +126,11 @@ type Net struct {
 
 	// Incoming packet handler
 	RxHandler func([]byte)
+
+	// HeaderLength allows to override the VirtIO network device header
+	// length as some implementations, such as QEMU, omit certain fields.
+	HeaderLength int
+
 	// Maximum Transmission Unit
 	MTU uint16
 
@@ -143,7 +145,7 @@ type Net struct {
 
 func (hw *Net) initQueue(index int, flags uint16) (queue *virtio.VirtualQueue) {
 	size := hw.io.MaxQueueSize(index)
-	length := hw.MTU + uint16(HeaderLength)
+	length := hw.MTU + uint16(hw.HeaderLength)
 
 	queue = &virtio.VirtualQueue{}
 	queue.Init(size, int(length), flags)
@@ -179,6 +181,10 @@ func (hw *Net) Init() (err error) {
 
 	if hw.io.QueueReady(rxq) || hw.io.QueueReady(txq) {
 		return errors.New("queues unavailable")
+	}
+
+	if hw.HeaderLength == 0 {
+		hw.HeaderLength = headerLength
 	}
 
 	hw.rx = hw.initQueue(rxq, virtio.Write)
@@ -232,17 +238,17 @@ func (hw *Net) Start(rx bool) {
 func (hw *Net) Rx() []byte {
 	buf := hw.rx.Pop()
 
-	if len(buf) < HeaderLength {
+	if len(buf) < hw.HeaderLength {
 		return nil
 	}
 
-	return buf[HeaderLength:]
+	return buf[hw.HeaderLength:]
 }
 
 // Tx transmits a single network frame, the checksum is appended automatically
 // and must not be included.
 func (hw *Net) Tx(buf []byte) {
-	hdr := make([]byte, HeaderLength)
+	hdr := make([]byte, hw.HeaderLength)
 	buf = append(hdr, buf...)
 
 	hw.tx.Push(buf)
