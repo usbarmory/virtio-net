@@ -171,7 +171,7 @@ func (hw *Net) Init() (err error) {
 	}
 
 	if mtu := hw.Config().MTU; hw.MTU > mtu {
-		return fmt.Errorf("incompatible MTU ID (%d > %d)", hw.MTU, mtu)
+		return fmt.Errorf("incompatible MTU (%d > %d)", hw.MTU, mtu)
 	}
 
 	if hw.io.QueueReady(rxq) || hw.io.QueueReady(txq) {
