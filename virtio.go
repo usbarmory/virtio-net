@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/usbarmory/tamago/bits"
 	"github.com/usbarmory/tamago/kvm/virtio"
 )
 
@@ -170,8 +171,10 @@ func (hw *Net) Init() (err error) {
 		return fmt.Errorf("incompatible device ID (%x != DeviceID)", id, DeviceID)
 	}
 
-	if mtu := hw.Config().MTU; hw.MTU > mtu {
-		return fmt.Errorf("incompatible MTU (%d > %d)", hw.MTU, mtu)
+	if features := hw.io.NegotiatedFeatures(); bits.IsSet64(&features, FeatureMTU) {
+		if mtu := hw.Config().MTU; hw.MTU > mtu {
+			return fmt.Errorf("incompatible MTU (%d > %d)", hw.MTU, mtu)
+		}
 	}
 
 	if hw.io.QueueReady(rxq) || hw.io.QueueReady(txq) {
@@ -207,6 +210,7 @@ func (hw *Net) Start(rx bool) {
 
 	hw.io.SetQueue(rxq, hw.rx)
 	hw.io.SetQueue(txq, hw.tx)
+	hw.io.SetReady()
 
 	hw.io.QueueNotify(rxq)
 

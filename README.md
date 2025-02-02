@@ -23,7 +23,7 @@ iface, _ := vnet.Init(dev, "10.0.0.1", "255.255.255.0", "10.0.0.2")
 net.SocketFunc = iface.Socket
 ```
 
-See [tamago-example](https://github.com/usbarmory/tamago-example/blob/master/network/microvm.go)
+See [tamago-example](https://github.com/usbarmory/tamago-example/blob/master/network/virtio.go)
 for a full integration example.
 
 Authors
