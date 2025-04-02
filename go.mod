@@ -1,9 +1,9 @@
 module github.com/usbarmory/virtio-net
 
-go 1.23.5
+go 1.24.1
 
 require (
-	github.com/usbarmory/tamago v0.0.0-20250202140954-4e943a908933
+	github.com/usbarmory/tamago v0.0.0-20250402100844-aab4d944badc
 	gvisor.dev/gvisor v0.0.0-20250115195935-26653e7d8816
 )
 

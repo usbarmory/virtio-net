@@ -22,7 +22,7 @@ import (
 // Device parameters
 const (
 	DeviceID   = 0x01
-	ConfigSize = 24
+	ConfigSize = 12
 )
 
 // virtual queue pairs
@@ -102,15 +102,9 @@ type Config struct {
 	// MTU represents the Ethernet Maximum Transmission Unit.
 	MTU uint16
 	// Speed represents the device speed in units of 1Mbps.
-	Speed uint32
+	//Speed uint32
 	// Duplex represents the communication mode.
-	Duplex uint8
-	// RSSMaxKeySize represents the Receive Side Scaling hash maximum key size.
-	RSSMaxKeySize uint8
-	// RSSMaxIndirectionTableLength represents the Receive Side Scaling maximum indirection table length.
-	RSSMaxIndirectionTableLength uint16
-	// SupportedHashTypes represents the supported hash types.
-	SupportedHashTypes uint32
+	//Duplex uint8
 }
 
 // Net represents a VirtIO network device instance.
@@ -119,8 +113,8 @@ type Net struct {
 
 	// Controller index
 	Index int
-	// Base register
-	Base uint32
+	// VirtIO Transport instance
+	Transport virtio.VirtIO
 	// Interrupt ID
 	IRQ int
 
@@ -134,9 +128,6 @@ type Net struct {
 	// Maximum Transmission Unit
 	MTU uint16
 
-	// VirtIO instance
-	io *virtio.VirtIO
-
 	// receive queue
 	rx *virtio.VirtualQueue
 	// transmit queue
@@ -144,13 +135,13 @@ type Net struct {
 }
 
 func (hw *Net) initQueue(index int, flags uint16) (queue *virtio.VirtualQueue) {
-	size := hw.io.MaxQueueSize(index)
+	size := hw.Transport.MaxQueueSize(index)
 	length := hw.MTU + uint16(hw.HeaderLength)
 
 	queue = &virtio.VirtualQueue{}
 	queue.Init(size, int(length), flags)
 
-	hw.io.SetQueueSize(index, size)
+	hw.Transport.SetQueueSize(index, size)
 
 	return
 }
@@ -160,26 +151,21 @@ func (hw *Net) Init() (err error) {
 	hw.Lock()
 	defer hw.Unlock()
 
-	hw.io = &virtio.VirtIO{
-		Base:       hw.Base,
-		ConfigSize: ConfigSize,
-	}
-
-	if err := hw.io.Init(DriverFeatures); err != nil {
+	if err := hw.Transport.Init(DriverFeatures); err != nil {
 		return err
 	}
 
-	if id := hw.io.DeviceID(); id != DeviceID {
-		return fmt.Errorf("incompatible device ID (%x != DeviceID)", id, DeviceID)
+	if id := hw.Transport.DeviceID(); id != DeviceID {
+		return fmt.Errorf("incompatible device ID (%x != %x)", id, DeviceID)
 	}
 
-	if features := hw.io.NegotiatedFeatures(); bits.IsSet64(&features, FeatureMTU) {
+	if features := hw.Transport.NegotiatedFeatures(); bits.IsSet64(&features, FeatureMTU) {
 		if mtu := hw.Config().MTU; hw.MTU > mtu {
 			return fmt.Errorf("incompatible MTU (%d > %d)", hw.MTU, mtu)
 		}
 	}
 
-	if hw.io.QueueReady(rxq) || hw.io.QueueReady(txq) {
+	if hw.Transport.QueueReady(rxq) || hw.Transport.QueueReady(txq) {
 		return errors.New("queues unavailable")
 	}
 
@@ -195,11 +181,12 @@ func (hw *Net) Init() (err error) {
 
 // Config returns the network device configuration.
 func (hw *Net) Config() (config Config) {
-	if hw.io == nil || len(hw.io.Config) != ConfigSize {
+	if hw.Transport == nil {
 		return
 	}
 
-	binary.Decode(hw.io.Config, binary.LittleEndian, &config)
+	data := hw.Transport.Config(ConfigSize)
+	binary.Decode(data, binary.LittleEndian, &config)
 
 	return
 }
@@ -214,11 +201,11 @@ func (hw *Net) Start(rx bool) {
 		return
 	}
 
-	hw.io.SetQueue(rxq, hw.rx)
-	hw.io.SetQueue(txq, hw.tx)
-	hw.io.SetReady()
+	hw.Transport.SetQueue(rxq, hw.rx)
+	hw.Transport.SetQueue(txq, hw.tx)
+	hw.Transport.SetReady()
 
-	hw.io.QueueNotify(rxq)
+	hw.Transport.QueueNotify(rxq)
 
 	if !rx || hw.RxHandler == nil {
 		return
@@ -252,5 +239,5 @@ func (hw *Net) Tx(buf []byte) {
 	buf = append(hdr, buf...)
 
 	hw.tx.Push(buf)
-	hw.io.QueueNotify(txq)
+	hw.Transport.QueueNotify(txq)
 }

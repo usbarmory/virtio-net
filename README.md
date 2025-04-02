@@ -14,8 +14,22 @@ The interface TCP/IP stack can be attached to the Go runtime by setting
 `net.SocketFunc` to the interface `Socket` function:
 
 ```
+# VirtIO over MMIO
 dev := &vnet.Net{
-	Base: microvm.VIRTIO_NET_BASE,
+	Transport: &virtio.MMIO{
+		Base: vm.VIRTIO_NET0_BASE,
+	}
+}
+
+# VirtIO over PCI
+dev := &vnet.Net{
+	Transport: &virtio.PCI{
+		Device: pci.Probe(
+			0,
+			vm.VIRTIO_NET_PCI_VENDOR,
+			vm.VIRTIO_NET_PCI_DEVICE,
+		),
+	}
 }
 
 iface, _ := vnet.Init(dev, "10.0.0.1", "255.255.255.0", "10.0.0.2")
