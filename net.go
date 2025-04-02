@@ -36,7 +36,7 @@ import (
 
 var (
 	// MTU represents the Maximum Transmission Unit
-	MTU uint32 = 1518
+	MTU = 1518
 
 	// NICID represents the default gVisor NIC identifier
 	NICID = tcpip.NICID(1)
@@ -73,7 +73,7 @@ func (iface *Interface) configure(mac net.HardwareAddr, ip tcpip.AddressWithPref
 		return
 	}
 
-	iface.Link = channel.New(256, MTU, linkAddr)
+	iface.Link = channel.New(256, uint32(MTU), linkAddr)
 	iface.Link.LinkEPCapabilities |= stack.CapabilityResolutionRequired
 
 	linkEP := stack.LinkEndpoint(iface.Link)

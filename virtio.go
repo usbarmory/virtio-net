@@ -15,7 +15,8 @@ import (
 	"runtime"
 	"sync"
 
-	"github.com/usbarmory/tamago/bits"
+	"gvisor.dev/gvisor/pkg/tcpip/header"
+
 	"github.com/usbarmory/tamago/kvm/virtio"
 )
 
@@ -159,9 +160,9 @@ func (hw *Net) Init() (err error) {
 		return fmt.Errorf("incompatible device ID (%x != %x)", id, DeviceID)
 	}
 
-	if features := hw.Transport.NegotiatedFeatures(); bits.IsSet64(&features, FeatureMTU) {
-		if mtu := hw.Config().MTU; hw.MTU > mtu {
-			return fmt.Errorf("incompatible MTU (%d > %d)", hw.MTU, mtu)
+	if features := hw.Transport.NegotiatedFeatures(); features&FeatureMTU == FeatureMTU {
+		if mtu := hw.Config().MTU; hw.MTU > mtu+header.EthernetMaximumSize {
+			return fmt.Errorf("incompatible MTU (%d > %d)\n", hw.MTU, mtu)
 		}
 	}
 
