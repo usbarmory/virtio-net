@@ -161,8 +161,8 @@ func (hw *Net) Init() (err error) {
 	}
 
 	if features := hw.Transport.NegotiatedFeatures(); features&FeatureMTU == FeatureMTU {
-		if mtu := hw.Config().MTU; hw.MTU > mtu+header.EthernetMaximumSize {
-			return fmt.Errorf("incompatible MTU (%d > %d)\n", hw.MTU, mtu)
+		if mtu := hw.Config().MTU; hw.MTU-header.EthernetMaximumSize > mtu {
+			return errors.New("incompatible MTU")
 		}
 	}
 
