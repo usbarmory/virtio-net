@@ -29,9 +29,9 @@ const (
 // virtual queue pairs
 const (
 	// receiveq1
-	rxq = 0
+	ReceiveQueue = 0
 	// transmitq1
-	txq = 1
+	TransmitQueue = 1
 )
 
 // Configuration constants
@@ -166,7 +166,7 @@ func (hw *Net) Init() (err error) {
 		}
 	}
 
-	if hw.Transport.QueueReady(rxq) || hw.Transport.QueueReady(txq) {
+	if hw.Transport.QueueReady(ReceiveQueue) || hw.Transport.QueueReady(TransmitQueue) {
 		return errors.New("queues unavailable")
 	}
 
@@ -174,8 +174,8 @@ func (hw *Net) Init() (err error) {
 		hw.HeaderLength = headerLength
 	}
 
-	hw.rx = hw.initQueue(rxq, virtio.Write)
-	hw.tx = hw.initQueue(txq, 0)
+	hw.rx = hw.initQueue(ReceiveQueue, virtio.Write)
+	hw.tx = hw.initQueue(TransmitQueue, 0)
 
 	return
 }
@@ -202,11 +202,11 @@ func (hw *Net) Start(rx bool) {
 		return
 	}
 
-	hw.Transport.SetQueue(rxq, hw.rx)
-	hw.Transport.SetQueue(txq, hw.tx)
+	hw.Transport.SetQueue(ReceiveQueue, hw.rx)
+	hw.Transport.SetQueue(TransmitQueue, hw.tx)
 	hw.Transport.SetReady()
 
-	hw.Transport.QueueNotify(rxq)
+	hw.Transport.QueueNotify(ReceiveQueue)
 
 	if !rx || hw.RxHandler == nil {
 		return
@@ -240,5 +240,5 @@ func (hw *Net) Tx(buf []byte) {
 	buf = append(hdr, buf...)
 
 	hw.tx.Push(buf)
-	hw.Transport.QueueNotify(txq)
+	hw.Transport.QueueNotify(TransmitQueue)
 }
